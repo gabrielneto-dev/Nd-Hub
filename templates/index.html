@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="antialiased text-slate-800 bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ND Hub - Painel de Controle</title>
+    
+    <!-- Fonte Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- TailwindCSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'card': '0 1px 3px rgba(0,0,0,0.02), 0 4px 14px rgba(0,0,0,0.04)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Custom CSS Baseado no Static -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- iframe oculto: fornece XMLHttpRequest nativo nao interceptado por extensoes Chrome -->
+    <iframe id="native-xhr-frame" style="display:none;width:0;height:0;border:none;" src="about:blank"></iframe>
+
+    <!-- Overlay de Processamento Global -->
+    <div id="conversion-overlay" class="fixed inset-0 z-[9999] hidden items-center justify-center" style="background: rgba(15,23,42,0.75); backdrop-filter: blur(4px);">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center max-w-sm w-full mx-4 text-center">
+            <!-- Spinner animado -->
+            <div class="relative w-20 h-20 mb-5">
+                <div class="absolute inset-0 rounded-full border-4 border-slate-100"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-transparent border-t-brand-500 animate-spin"></div>
+                <div class="absolute inset-2 rounded-full border-4 border-transparent border-t-indigo-400 animate-spin" style="animation-direction: reverse; animation-duration: 0.7s;"></div>
+                <i class="ph ph-lightning absolute inset-0 flex items-center justify-center text-2xl text-brand-500" style="line-height: 80px;"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 mb-1" id="overlay-title">Convertendo...</h3>
+            <p class="text-sm text-slate-500 mb-4" id="overlay-subtitle">Aguarde enquanto o Python processa seus arquivos</p>
+            <!-- Barra de progresso indeterminada -->
+            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-brand-500 via-indigo-400 to-brand-500 rounded-full animate-[shimmer_1.5s_ease-in-out_infinite]" style="background-size: 200% 100%; animation: shimmer 1.5s linear infinite; width: 100%;"></div>
+            </div>
+            <p class="text-xs text-slate-400 mt-3">Não feche esta aba</p>
+        </div>
+    </div>
+    <style>
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+
+    <!-- HOME VIEW -->
+    <div id="home-view" class="flex-1 flex flex-col px-6 py-12 max-w-7xl mx-auto w-full transition-all duration-300">
+        
+        <header class="mb-10">
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">Painel de Controle</h1>
+            <p class="text-slate-500 font-medium">Selecione uma ferramenta para começar a usar o ND Hub.</p>
+        </header>
+
+        <!-- Search Bar Mock -->
+        <div class="relative w-full max-w-3xl mb-12">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <i class="ph ph-magnifying-glass text-slate-400 text-lg"></i>
+            </div>
+            <input type="text" class="block w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition" placeholder="Buscar ferramentas por nome ou comando...">
+        </div>
+
+        <!-- Grid Cards -->
+        <div id="tools-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Cards gerados dinamicamente vão aqui -->
+            <div class="col-span-full py-20 text-center text-slate-400 flex flex-col items-center justify-center">
+                <i class="ph ph-spinner-gap animate-spin text-3xl mb-4 text-brand-500"></i>
+                <p>Carregando ferramentas...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOOL VIEW (Sidebar + Content) -->
+    <div id="tool-view" class="flex-1 flex h-screen hidden-view fixed inset-0 bg-slate-50 z-50">
+        
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col h-full shadow-soft transition-all duration-300">
+            <!-- Header Sidebar -->
+            <div class="p-6 border-b border-slate-100">
+                <button onclick="goHome()" class="flex items-center text-slate-500 hover:text-brand-600 transition-colors mb-6 group font-medium text-sm">
+                    <i class="ph ph-arrow-left mr-2 text-lg group-hover:-translate-x-1 transition-transform"></i>
+                    Voltar ao Início
+                </button>
+                <div class="flex items-center space-x-3">
+                    <div id="sidebar-tool-icon" class="w-10 h-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center text-xl">
+                        <i class="ph ph-wrench"></i>
+                    </div>
+                    <h2 id="sidebar-tool-name" class="font-semibold text-lg text-slate-800 leading-tight">Ferramenta</h2>
+                </div>
+            </div>
+
+            <!-- Navegação da Ferramenta -->
+            <div class="p-4 flex-1">
+                <p class="px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Navegação Local</p>
+                <nav class="space-y-1">
+                    <a href="#" class="flex items-center px-3 py-2 text-sm font-medium bg-brand-50 text-brand-700 rounded-lg">
+                        <i class="ph ph-play-circle mr-3 text-lg"></i> Run Script
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">
+                        <i class="ph ph-list-dashes mr-3 text-lg"></i> Logs e Histórico
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors">
+                        <i class="ph ph-sliders mr-3 text-lg"></i> Parâmetros
+                    </a>
+                </nav>
+            </div>
+            
+            <!-- Context Info -->
+            <div class="p-6 border-t border-slate-100 bg-slate-50 mt-auto">
+                <p class="text-xs text-slate-500">
+                    <span class="font-medium text-slate-700">Status:</span> Pronto para execução<br>
+                    <span class="font-medium text-slate-700">Comando:</span> <code id="sidebar-tool-cmd" class="font-mono text-[10px] bg-slate-200 px-1 py-0.5 rounded text-slate-600 break-all">...</code>
+                </p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-full bg-slate-50 relative overflow-hidden">
+            <div class="flex-1 overflow-y-auto p-10">
+                <div class="max-w-4xl mx-auto">
+                    <!-- Tool Header Inside Content -->
+                    <div class="mb-8">
+                        <h1 id="content-tool-name" class="text-3xl font-bold text-slate-900 mb-2">Nome da Ferramenta</h1>
+                        <p id="content-tool-desc" class="text-slate-500 text-lg">Descrição breve sobre o que essa ferramenta faz quando executada.</p>
+                    </div>
+
+                    <!-- Action Area -->
+                    <div id="cli-action-area" class="bg-white rounded-2xl shadow-card border border-slate-100 p-8 mb-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 class="text-lg font-semibold text-slate-800">Pronto para iniciar</h3>
+                                <p class="text-sm text-slate-500">Clique para executar o comando no servidor local.</p>
+                            </div>
+                            <button id="run-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow active:scale-95 flex items-center justify-center min-w-[140px]">
+                                <span class="btn-text">Executar Agora</span>
+                                <i class="ph ph-play ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Output Console Area -->
+                    <div id="cli-console-area" class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 overflow-hidden flex flex-col h-[400px]">
+                        <div class="bg-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-700">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500/80"></div>
+                                <span class="ml-3 font-mono text-xs text-slate-400">Terminal Output</span>
+                            </div>
+                            <button id="clear-term-btn" class="text-xs text-slate-400 hover:text-white transition-colors">Limpar</button>
+                        </div>
+                        <div class="p-4 flex-1 overflow-y-auto terminal-scroll bg-[#0f172a]">
+                            <pre id="output-console" class="font-mono text-sm leading-relaxed text-slate-300 whitespace-pre-wrap"><span class="text-slate-500">Aguardando execução...</span></pre>
+                        </div>
+                    </div>
+
+                    <!-- Áudio UI Area -->
+                    <div id="audio-ui-area" class="hidden-view mt-4">
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center space-x-4">
+                                <h3 class="text-xl font-semibold text-slate-800">Dispositivos de Saída disponíveis</h3>
+                                <label class="flex items-center space-x-2 text-sm text-slate-500 cursor-pointer hover:text-slate-700 transition">
+                                    <input type="checkbox" id="toggle-archived" onchange="toggleArchived(this)" class="rounded border-slate-300 text-brand-500 focus:ring-brand-500">
+                                    <span>Exibir Arquivados</span>
+                                </label>
+                            </div>
+                            <span class="text-xs text-slate-500 font-medium bg-slate-200 px-3 py-1 rounded-full flex items-center shadow-sm"><i class="ph ph-keyboard mr-1"></i> Atalhos: Teclas 1 a 9</span>
+                        </div>
+                        <div id="audio-devices-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Cards de áudio injetados via JS -->
+                        </div>
+                    </div>
+
+                    <!-- System UI Area -->
+                    <div id="system-ui-area" class="hidden-view mt-4">
+                        <div class="mb-6">
+                            <h3 class="text-xl font-semibold text-slate-800">Controles de Energia e Sessão</h3>
+                            <p class="text-sm text-slate-500 mt-1">Ações diretas usando permissões locais do seu sistema operacional.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <!-- Suspend -->
+                            <div onclick="requestSystemAction('suspend', 'Suspender Sessão')" class="bg-white hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-2xl p-6 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center group">
+                                <div class="w-16 h-16 rounded-full bg-slate-100 group-hover:bg-brand-100 flex items-center justify-center text-3xl text-slate-600 group-hover:text-brand-600 mb-4 transition-colors"><i class="ph ph-moon"></i></div>
+                                <h4 class="font-bold text-slate-800 group-hover:text-brand-700">Suspender</h4>
+                                <p class="text-xs text-slate-500 mt-2">Dormir mantendo a RAM ativada.</p>
+                            </div>
+                            
+                            <!-- Hibernate -->
+                            <div onclick="requestSystemAction('hibernate', 'Hibernar Máquina')" class="bg-white hover:bg-brand-50 border border-slate-200 hover:border-brand-300 rounded-2xl p-6 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center group">
+                                <div class="w-16 h-16 rounded-full bg-slate-100 group-hover:bg-brand-100 flex items-center justify-center text-3xl text-slate-600 group-hover:text-brand-600 mb-4 transition-colors"><i class="ph ph-snowflake"></i></div>
+                                <h4 class="font-bold text-slate-800 group-hover:text-brand-700">Hibernar</h4>
+                                <p class="text-xs text-slate-500 mt-2">Salvar no disco e desligar a CPU.</p>
+                            </div>
+                            
+                            <!-- Poweroff -->
+                            <div onclick="requestSystemAction('poweroff', 'Desligar Computador')" class="bg-white hover:bg-red-50 border border-slate-200 hover:border-red-300 rounded-2xl p-6 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center group">
+                                <div class="w-16 h-16 rounded-full bg-slate-100 group-hover:bg-red-100 flex items-center justify-center text-3xl text-slate-600 group-hover:text-red-600 mb-4 transition-colors"><i class="ph ph-power"></i></div>
+                                <h4 class="font-bold text-slate-800 group-hover:text-red-700">Desligar</h4>
+                                <p class="text-xs text-slate-500 mt-2">Encerrar com segurança.</p>
+                            </div>
+                            
+                            <!-- Reboot -->
+                            <div onclick="requestSystemAction('reboot', 'Reiniciar Máquina')" class="bg-white hover:bg-orange-50 border border-slate-200 hover:border-orange-300 rounded-2xl p-6 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center group">
+                                <div class="w-16 h-16 rounded-full bg-slate-100 group-hover:bg-orange-100 flex items-center justify-center text-3xl text-slate-600 group-hover:text-orange-600 mb-4 transition-colors"><i class="ph ph-arrows-clockwise"></i></div>
+                                <h4 class="font-bold text-slate-800 group-hover:text-orange-700">Reiniciar</h4>
+                                <p class="text-xs text-slate-500 mt-2">Ciclo de energia morno (ACPI).</p>
+                            </div>
+                            
+                            <!-- Restart Video Driver -->
+                            <div onclick="requestSystemAction('restart_video', 'Reiniciar Display (gdm3)')" class="bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-300 rounded-2xl p-6 cursor-pointer transition-all hover:shadow-md flex flex-col items-center justify-center text-center group">
+                                <div class="w-16 h-16 rounded-full bg-slate-100 group-hover:bg-purple-100 flex items-center justify-center text-3xl text-slate-600 group-hover:text-purple-600 mb-4 transition-colors"><i class="ph ph-monitor"></i></div>
+                                <h4 class="font-bold text-slate-800 group-hover:text-purple-700">Restaurar Vídeo</h4>
+                                <p class="text-xs text-slate-500 mt-2">Corrigir artefatos reiniciando GDM.</p>
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    <!-- Project Manager Area -->
+                    <div id="project-ui-area" class="hidden-view mt-4">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                            <div>
+                                <h3 class="text-xl font-semibold text-slate-800">Portfólio de Códigos</h3>
+                                <p class="text-sm text-slate-500 mt-1">Gerencie e abra instâncias instantâneas de projetos via Nvim.</p>
+                            </div>
+                            <button onclick="window.toggleAddProjectModal(true)" class="mt-4 md:mt-0 bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center shadow-sm">
+                                <i class="ph ph-plus-circle mr-2 text-lg"></i> Adicionar Local
+                            </button>
+                        </div>
+                        
+                        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm whitespace-nowrap">
+                                    <thead class="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                        <tr>
+                                            <th class="px-6 py-4">Nome</th>
+                                            <th class="px-6 py-4">Caminho / Start Hook</th>
+                                            <th class="px-6 py-4 text-center">Status Válido</th>
+                                            <th class="px-6 py-4 text-right">Ação NeoVim</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="projects-table-body" class="divide-y divide-slate-100 text-slate-700">
+                                        <tr>
+                                            <td colspan="4" class="px-6 py-8 text-center text-slate-400">
+                                                <i class="ph ph-spinner-gap animate-spin text-2xl mb-2 text-brand-500"></i>
+                                                <p>Sincronizando SQLite...</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Modal de Adicionar Projeto -->
+                        <div id="add-proj-modal" class="hidden fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
+                            <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6">
+                                <h3 class="text-xl font-bold text-slate-800 mb-4">Adicionar um Projeto</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Apelido do Projeto</label>
+                                        <input type="text" id="add-proj-name" placeholder="Ex: Meu Site React" class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Caminho Físico (Path)</label>
+                                        <input type="text" id="add-proj-path" placeholder="/home/neto/Documentos/site" class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Start Hook Automático (Bash)</label>
+                                        <input type="text" id="add-proj-pre" placeholder="Ex: source .venv/bin/activate" class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none text-slate-500 font-mono text-xs">
+                                        <p class="text-[10px] text-slate-400 mt-1">Este hook roda silênciosamente antes de abrir o editor de código.</p>
+                                    </div>
+                                </div>
+                                <div class="mt-6 flex space-x-3">
+                                    <button onclick="window.saveNewProject()" class="flex-1 bg-brand-600 text-white font-medium py-2 rounded-lg hover:bg-brand-700 transition active:scale-95">Salvar Ficha</button>
+                                    <button onclick="window.toggleAddProjectModal(false)" class="flex-1 bg-slate-100 text-slate-600 font-medium py-2 rounded-lg hover:bg-slate-200 transition active:scale-95">Cancelar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Convertor UI Area -->
+                    <div id="convert-ui-area" class="hidden-view mt-4">
+                        <!-- Header -->
+                        <div class="mb-6 flex flex-col sm:flex-row justify-between sm:items-center">
+                            <div>
+                                <h3 class="text-xl font-semibold text-slate-800">Convertix Studio</h3>
+                                <p class="text-sm text-slate-500 mt-1">Imagens, Vídeos, Documentos e Dados. Escolha de onde vêm os arquivos:</p>
+                            </div>
+                            <div class="mt-4 sm:mt-0 flex bg-slate-200 p-1 rounded-lg">
+                                <button onclick="window.switchConvertTab('local')" id="tab-local" class="px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-slate-800 transition-all">📂 File Browser Local</button>
+                                <button onclick="window.switchConvertTab('web')" id="tab-web" class="px-4 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:bg-slate-300 hover:text-slate-800 transition-all">☁️ Web Upload (Drag&Drop)</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab 1: Local Explorer -->
+                        <div id="convert-tab-local" class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-[600px] transition-all">
+                            <div class="bg-slate-50 p-3 border-b border-slate-200 flex items-center space-x-2">
+                                <button onclick="window.navigateFsUp()" class="p-2 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded transition"><i class="ph ph-arrow-up text-lg"></i></button>
+                                <input type="text" id="fs-current-path" onkeydown="window.handlePathEnter(event)" class="flex-1 px-3 py-1.5 text-sm font-mono border border-slate-300 rounded focus:border-brand-500 focus:outline-none" value="/home/neto">
+                                <button onclick="window.loadFs(document.getElementById('fs-current-path').value)" class="p-2 bg-brand-600 text-white rounded hover:bg-brand-700 transition"><i class="ph ph-arrow-right"></i></button>
+                            </div>
+                            
+                            <div class="bg-white border-b border-slate-200 px-4 py-3 flex items-center shadow-sm z-10">
+                                <i class="ph ph-magnifying-glass text-slate-400 mr-3 text-lg"></i>
+                                <input type="text" id="fs-search-input" oninput="window.filterFs()" placeholder="Filtrar arquivos na pasta atual..." class="w-full text-sm outline-none text-slate-700 bg-transparent placeholder-slate-300">
+                                <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded font-mono border border-slate-200" id="fs-item-count">0</span>
+                            </div>
+                            
+                            <div class="flex-1 overflow-y-auto p-4 bg-slate-50" id="fs-container">
+                                <!-- Items rendered via JS -->
+                                <div class="flex items-center justify-center h-full text-slate-400">
+                                    <i class="ph ph-spinner-gap animate-spin text-2xl mr-2"></i> Inicializando Sistema de Arquivos...
+                                </div>
+                            </div>
+                            
+                            <!-- Painel lateral de Ação de Conversão DENTRO do Tab Local (vai aparecer só qnd selecionar) -->
+                            <div id="fs-action-panel" class="hidden bg-slate-800 text-slate-200 p-4 border-t border-slate-700 flex flex-col sm:flex-row justify-between items-center relative shadow-[0_-10px_20px_rgba(0,0,0,0.1)] z-10">
+                                 <div class="flex-1 overflow-hidden pr-4 w-full mb-3 sm:mb-0">
+                                     <span id="fs-selected-count" class="font-bold text-white block">0 itens na memória central</span>
+                                     <button onclick="window.clearFsSelection()" class="text-[10px] text-slate-400 font-bold bg-slate-900 px-2 py-1 mt-1.5 rounded border border-slate-700 hover:text-white transition uppercase active:scale-95"><i class="ph ph-trash mr-1"></i> Esvaziar Seleção</button>
+                                 </div>
+                                 <div class="flex items-center w-full sm:w-auto">
+                                     <button id="fs-checkout-btn" onclick="window.openFsCheckoutModal()" class="bg-brand-500 hover:bg-brand-600 text-white px-6 py-2 rounded transition shadow-sm font-bold active:scale-95 flex items-center w-full justify-center shrink-0">
+                                         <i class="ph ph-check-square-offset text-xl mr-2"></i> <span>Revisar e Lançar Conversão</span>
+                                     </button>
+                                 </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab 2: Web Drag & Drop -->
+                        <div id="convert-tab-web" class="hidden bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-8 text-center transition-all min-h-[600px] flex flex-col relative group">
+                            
+                            <!-- Area de Selecao via Dialogo Nativo / Drag-and-Drop -->
+                            <div id="web-dropzone-area" class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 transition-all p-8 flex flex-col items-center justify-center relative mb-6 shrink-0 cursor-pointer group hover:border-brand-400 hover:bg-brand-50">
+                                <div class="w-16 h-16 bg-white rounded-full mx-auto flex items-center justify-center text-3xl text-brand-500 mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                                    <i class="ph ph-folder-open"></i>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-700 mb-1">Arraste Arquivos Aqui ou Selecione</h3>
+                                <p class="text-sm text-slate-500 max-w-md mx-auto mb-5">Arraste da sua área de trabalho, ou clique nos botões para abrir o seletor de arquivos nativo.</p>
+                                <div class="flex gap-3 flex-wrap justify-center">
+                                    <button id="btn-pick-native" onclick="window.pickFilesNative(false)" class="bg-brand-500 hover:bg-brand-600 text-white px-6 py-3 rounded-xl font-bold shadow-md transition active:scale-95 flex items-center gap-2">
+                                        <i class="ph ph-files text-xl"></i> Selecionar Arquivos
+                                    </button>
+                                    <button onclick="window.pickFilesNative(true)" class="bg-slate-700 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold shadow-md transition active:scale-95 flex items-center gap-2">
+                                        <i class="ph ph-folder text-xl"></i> Selecionar Pasta
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-4 flex items-center gap-1">
+                                    <i class="ph ph-info"></i>
+                                    Arrastar também abre o seletor automaticamente
+                                </p>
+                            </div>
+                            
+                            <!-- Staging Area Dinâmica (Container dos Blocos) -->
+                            <div id="web-staging-area" class="flex-1 text-left hidden flex-col">
+                                <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                                    <h4 class="font-bold text-slate-700 text-lg flex items-center"><i class="ph ph-stack flex-shrink-0 text-brand-500 mr-2 text-xl"></i> Sua Cesta de Transcodificação</h4>
+                                    <button onclick="window.clearWebSelection()" class="text-xs bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-600 px-3 py-1.5 rounded transition font-medium"><i class="ph ph-trash"></i> Esvaziar Cesta</button>
+                                </div>
+                                
+                                <div class="flex flex-col sm:flex-row gap-4 mb-4 bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
+                                    <div class="flex-1">
+                                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">🔖 Prefixo do Arquivo (Opcional)</label>
+                                        <input type="text" id="web-config-prefix" placeholder="Ex: edit_" class="w-full bg-white border border-slate-300 text-slate-700 text-sm rounded px-3 py-2 outline-none focus:border-brand-500">
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">📁 Agrupar em Subpasta no ZIP</label>
+                                        <input type="text" id="web-config-folder" placeholder="Ex: editadas" class="w-full bg-white border border-slate-300 text-slate-700 text-sm rounded px-3 py-2 outline-none focus:border-brand-500">
+                                    </div>
+                                </div>
+                                
+                                <div id="web-blocks-container" class="space-y-6 overflow-y-auto pr-2 pb-10">
+                                    <!-- Renderizado dev agar pelo JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Result Area global (Opcional, o ZIP cai direto no download) -->
+                            <div id="web-result-area" class="hidden mt-6 bg-green-50 border border-green-200 rounded-xl p-4 flex justify-between items-center animate-[pulse_1s_ease-in-out]">
+                                <div class="flex items-center text-left">
+                                    <i class="ph-fill ph-check-circle text-3xl text-green-600 mr-3"></i>
+                                    <div>
+                                        <p class="text-green-800 font-bold text-sm">Conversão Concluída</p>
+                                        <p class="text-green-600 text-xs">O download do seu Zip já deve ter iniciado.</p>
+                                    </div>
+                                </div>
+                                <a id="web-download-btn" href="#" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-medium shadow-sm transition active:scale-95 flex items-center">
+                                    <i class="ph ph-download-simple mr-2"></i> Baixar Manualmente
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal de Preview Nativo -->
+                    <!-- Clicar EM QUALQUER lugar fora do conteudo central fecha o modal -->
+                    <div id="fs-preview-modal" class="hidden fixed inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4 backdrop-blur-md opacity-0 transition-opacity duration-300 pointer-events-none cursor-pointer" onclick="window.closeFsPreview()">
+                        <div class="bg-transparent rounded-2xl w-full h-[95vh] shadow-2xl overflow-hidden flex flex-col pointer-events-auto">
+                            <!-- Header: para propagação para não fechar ao clicar no título/x -->
+                            <div class="flex justify-between items-center p-4" onclick="event.stopPropagation()">
+                                <div class="bg-slate-800/80 backdrop-blur px-4 py-2 rounded-full border border-slate-700 max-w-sm sm:max-w-xl truncate">
+                                    <h3 id="fs-preview-title" class="text-sm font-mono text-slate-200">/preview.png</h3>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="window.closeFsPreview()" class="text-slate-400 hover:text-white bg-slate-800/80 backdrop-blur p-2 rounded-full border border-slate-700 transition w-10 h-10 flex items-center justify-center shadow-lg hover:bg-red-500/20 hover:border-red-500/30"><i class="ph ph-x"></i></button>
+                                </div>
+                            </div>
+                            <!-- Área de conteúdo: clicar ao redor da mídia (no padding) fecha o modal -->
+                            <!-- A mídia em si para propagação via CSS pointer-events -->
+                            <div class="p-2 sm:p-6 flex-1 overflow-auto flex items-center justify-center cursor-pointer" id="fs-preview-content">
+                                <!-- content dynamically inserted -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modal Checkout Local -->
+                    <div id="fs-checkout-modal" class="hidden fixed inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4 backdrop-blur-md opacity-0 transition-opacity duration-300" onclick="window.closeFsCheckoutModal(event)">
+                        <div class="bg-slate-50 rounded-2xl w-full max-w-5xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-300" onclick="event.stopPropagation()">
+                            <div class="p-5 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm z-10 relative">
+                                <div>
+                                    <h3 class="text-xl font-bold text-slate-800 flex items-center"><i class="ph ph-list-checks text-brand-600 mr-2 text-3xl"></i> Checkout Lógico (Motor In-Place)</h3>
+                                    <p class="text-xs text-slate-500 mt-1 max-w-md">Especifique extensões globais para blocos inteiros. Tudo acontecerá fisicamente no seu computador sem envolver downloads web.</p>
+                                </div>
+                                <button onclick="window.closeFsCheckoutModal()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition"><i class="ph ph-x"></i></button>
+                            </div>
+                            
+                            <div class="bg-slate-100 p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-4 z-0">
+                                <div class="flex-1">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">🔖 Prefixo do Arquivo Físico</label>
+                                    <input type="text" id="local-config-prefix" placeholder="Ex: edit_" class="w-full bg-white border border-slate-300 text-slate-700 text-sm rounded px-3 py-2 outline-none focus:border-brand-500 shadow-sm">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">📁 Subpasta Relativa de Destino</label>
+                                    <input type="text" id="local-config-folder" placeholder="Ex: editadas" class="w-full bg-white border border-slate-300 text-slate-700 text-sm rounded px-3 py-2 outline-none focus:border-brand-500 shadow-sm">
+                                </div>
+                            </div>
+                            
+                            <div class="p-6 overflow-y-auto flex-1 space-y-6" id="fs-checkout-blocks-container">
+                                <!-- Preenchido pelo Javascript reaproveitando blocos html -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Lógica da Aplicação SPA -->
+    <script src="/static/js/convert_ui.js"></script>
+    <script src="/static/js/project_ui.js"></script>
+    <script src="/static/js/system_ui.js"></script>
+    <script src="/static/js/audio_ui.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

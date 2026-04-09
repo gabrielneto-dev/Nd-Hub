@@ -1,0 +1,43 @@
+/* Smooth transitions e animações */
+.fade-enter {
+    opacity: 0;
+    transform: translateY(10px);
+}
+.fade-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+.fade-exit {
+    opacity: 1;
+}
+.fade-exit-active {
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+}
+.hidden-view {
+    display: none !important;
+}
+
+/* Card hover micro-animations */
+.tool-card {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tool-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    border-color: #cbd5e1;
+}
+
+/* Custom scrollbar para o terminal */
+.terminal-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+.terminal-scroll::-webkit-scrollbar-track {
+    background: #1e293b;
+    border-radius: 4px;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+}

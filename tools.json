@@ -1,0 +1,30 @@
+[
+  {
+    "id": "audio-manager",
+    "name": "Gerenciador de Áudio",
+    "description": "Visualize e alterne a saída de som atual do sistema de forma interativa.",
+    "icon": "speaker-high",
+    "type": "audio"
+  },
+  {
+    "id": "system-manager",
+    "name": "Controles do Sistema",
+    "description": "Botões vitais para governar a sessão do Sistema Operacional local.",
+    "icon": "power",
+    "type": "system"
+  },
+  {
+    "id": "project-manager",
+    "name": "Gestor de Projetos NVIM",
+    "description": "Portfólio de códigos fontes. Conecte projetos ao NVIM disparando instâncias isoladas com hook-cmds automáticos em Background.",
+    "icon": "brackets-curly",
+    "type": "project"
+  },
+  {
+    "id": "convertix-gui",
+    "name": "Convertix Gui",
+    "description": "Ferramenta de conversão definitiva (Imagens, PDFs, Dados e Vídeos). Suporte para navegação de pasta local in-place e drag-drop web.",
+    "icon": "arrows-left-right",
+    "type": "convert"
+  }
+]
