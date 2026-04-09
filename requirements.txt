@@ -1,0 +1,11 @@
+flask
+python-dotenv
+Pillow
+pandas
+openpyxl
+reportlab
+python-docx
+pypdf
+tabulate
+pyyaml
+lxml
