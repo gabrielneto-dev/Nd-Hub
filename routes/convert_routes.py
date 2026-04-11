@@ -91,16 +91,21 @@ def find_by_names():
 
     search_dirs += [
         os.path.join(os.path.expanduser('~'), 'Desktop'),
+        os.path.join(os.path.expanduser('~'), 'Área de Trabalho'),
         os.path.join(os.path.expanduser('~'), 'Downloads'),
         os.path.join(os.path.expanduser('~'), 'Documentos'),
         os.path.join(os.path.expanduser('~'), 'Documents'),
         os.path.join(os.path.expanduser('~'), 'Imagens'),
         os.path.join(os.path.expanduser('~'), 'Pictures'),
+        os.path.join(os.path.expanduser('~'), 'Vídeos'),
+        os.path.join(os.path.expanduser('~'), 'Videos'),
+        os.path.join(os.path.expanduser('~'), 'Música'),
+        os.path.join(os.path.expanduser('~'), 'Music'),
         os.path.expanduser('~'),
     ]
-    # Remove duplicatas preservando ordem
+    # Remove duplicatas preservando ordem e remove caminhos inválidos
     seen = set()
-    search_dirs = [d for d in search_dirs if d not in seen and not seen.add(d) and os.path.isdir(d)]
+    search_dirs = [d for d in search_dirs if d and d not in seen and not seen.add(d) and os.path.isdir(d)]
 
     found = {}     # name → full path
     missing = []
@@ -117,14 +122,14 @@ def find_by_names():
             for root, dirs, filenames in os.walk(search_dir):
                 # Calcula profundidade relativa
                 depth = root.replace(search_dir, '').count(os.sep)
-                if depth >= 4:
+                if depth >= 10:  # Aumentado para 10 para buscas mais profundas
                     dirs[:] = []
                     continue
                 dirs[:] = [d for d in dirs if not d.startswith('.')]  # ignora ocultos
 
                 if name in filenames:
                     candidate = os.path.join(root, name)
-                    if size < 0 or abs(os.path.getsize(candidate) - size) < 1024:
+                    if size <= 0 or abs(os.path.getsize(candidate) - size) < 1024:
                         matched = candidate
                         break
 

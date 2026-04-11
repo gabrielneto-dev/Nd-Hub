@@ -9,3 +9,4 @@ pypdf
 tabulate
 pyyaml
 lxml
+gunicorn

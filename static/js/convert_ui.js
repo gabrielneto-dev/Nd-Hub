@@ -389,50 +389,101 @@ function getCatForExt(ext) {
 
 function setupWebDropzone() {
     const area = document.getElementById('web-dropzone-area');
-    if (area.dataset.dropSetup) return;
+    if (!area || area.dataset.dropSetup) return;
     area.dataset.dropSetup = true;
 
+    // 1) Prevenção global de comportamento padrão (evita que o navegador abra o arquivo caso "erre" a mira do componente)
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evtName => {
+        document.body.addEventListener(evtName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        area.addEventListener(evtName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
     area.addEventListener('dragover', (e) => {
-        e.preventDefault();
         area.classList.add('border-brand-500', 'bg-brand-50', 'scale-[1.01]');
         area.querySelector('h3').textContent = 'Solte para selecionar arquivos...';
-        area.querySelector('.ph-folder-open').classList.replace('ph-folder-open', 'ph-upload-simple');
+        area.querySelector('.ph-folder-open')?.classList.replace('ph-folder-open', 'ph-upload-simple');
     });
+
     area.addEventListener('dragleave', (e) => {
-        e.preventDefault();
         area.classList.remove('border-brand-500', 'bg-brand-50', 'scale-[1.01]');
         area.querySelector('h3').textContent = 'Arraste Arquivos Aqui ou Selecione';
         area.querySelector('.ph-upload-simple')?.classList.replace('ph-upload-simple', 'ph-folder-open');
     });
 
     area.addEventListener('drop', async (e) => {
-        e.preventDefault();
+        // Volta estilos ao normal
         area.classList.remove('border-brand-500', 'bg-brand-50', 'scale-[1.01]');
         area.querySelector('h3').textContent = 'Arraste Arquivos Aqui ou Selecione';
         area.querySelector('.ph-upload-simple')?.classList.replace('ph-upload-simple', 'ph-folder-open');
 
-        // 1) Tenta URI list (Firefox/Wayland com suporte)
-        const raw = e.dataTransfer.getData('text/uri-list') || '';
-        const uriPaths = raw.split('\n')
-            .map(u => u.trim().replace(/\r$/, ''))
-            .filter(u => u.length > 0 && u.startsWith('file://') && !u.startsWith('#'))
-            .map(u => decodeURIComponent(u.slice(7)));
+        // Captura primordial dos File Objects a partir do Drop (Ação Local & Web)
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) {
+            console.warn("Nenhum arquivo capturado no evento de drop.");
+            return;
+        }
 
-        if (uriPaths.length > 0) {
-            uriPaths.forEach(p => registerWebPath(p));
+        const droppedFiles = Array.from(files);
+
+        // Tentativa de Captura A: Checar se o browser/ambiente fornece ".path" real (ex: Electron, extensões locais)
+        let hasNativePaths = false;
+        droppedFiles.forEach(f => {
+            if (f.path) {
+                hasNativePaths = true;
+                registerWebPath(f.path, f); // Cadastra o local fisico e o próprio objeto
+            }
+        });
+
+        if (hasNativePaths) {
             document.getElementById('web-staging-area').classList.remove('hidden');
             renderWebBlocks();
             return;
         }
 
-        // 2) Chrome SÓ fornece File objects (sem caminho).
-        // Buscamos no disco pelo nome + tamanho para recuperar o caminho real.
-        const droppedFiles = Array.from(e.dataTransfer.files);
-        if (droppedFiles.length === 0) { window.pickFilesNative(); return; }
+        // Tentativa de Captura B: URIs do File Manager do Linux (Nautilus, Dolphin, etc.)
+        const uriData = e.dataTransfer.getData('text/uri-list') || '';
+        const plainData = e.dataTransfer.getData('text/plain') || '';
+        let rawPaths = (uriData + '\n' + plainData).split(/\r?\n/);
+        
+        const detectedPaths = rawPaths
+            .map(u => u.trim())
+            .filter(u => u.length > 0 && !u.startsWith('#'))
+            .map(u => {
+                // Parse local Linux Paths (file://)
+                if (u.startsWith('file://')) {
+                    try {
+                        let p = u.replace(/^file:\/\//, '');
+                        if (p.startsWith('localhost')) p = p.slice(9);
+                        if (!p.startsWith('/')) p = '/' + p;
+                        return decodeURIComponent(p);
+                    } catch(err) { return null; }
+                }
+                if (u.startsWith('/')) return u;
+                return null;
+            })
+            .filter(p => p !== null);
 
+        if (detectedPaths.length > 0) {
+            detectedPaths.forEach((path) => {
+                const name = path.split('/').pop() || '';
+                const matchedFile = droppedFiles.find(f => f.name === name) || null;
+                registerWebPath(path, matchedFile);
+            });
+            document.getElementById('web-staging-area').classList.remove('hidden');
+            renderWebBlocks();
+            return;
+        }
+
+        // Tentativa de Captura C: Buscar no disco usando o servidor Backend (nome+tamanho)
         const filesInfo = droppedFiles.map(f => ({ name: f.name, size: f.size }));
-        area.querySelector('h3').textContent = `Localizando ${droppedFiles.length} arquivo(s) no disco...`;
-
+        area.querySelector('h3').textContent = `Localizando ${droppedFiles.length} arquivo(s) longo(s) no sistema...`;
+        
         try {
             const res = await fetch('/api/fs/find_by_names', {
                 method: 'POST',
@@ -442,22 +493,29 @@ function setupWebDropzone() {
             const data = await res.json();
             area.querySelector('h3').textContent = 'Arraste Arquivos Aqui ou Selecione';
 
-            if (data.success && data.entries.length > 0) {
-                data.entries.forEach(entry => registerWebPath(entry.path));
-                document.getElementById('web-staging-area').classList.remove('hidden');
-                renderWebBlocks();
-                if (data.missing.length > 0) {
-                    alert(`⚠️ ${data.missing.length} arquivo(s) não localizado(s):\n${data.missing.join('\n')}\n\nVerifique se o arquivo está no Desktop, Downloads ou na pasta que você navegou no File Browser.`);
-                }
+            if (data.success) {
+                const foundNames = data.entries.map(e => e.name);
+                data.entries.forEach(entry => {
+                    const originalFile = droppedFiles.find(f => f.name === entry.name);
+                    registerWebPath(entry.path, originalFile);
+                });
+                
+                droppedFiles.forEach(f => {
+                    if (!foundNames.includes(f.name)) registerWebPath(null, f);
+                });
             } else {
-                // Não encontrou — abre zenity como fallback
-                const open = confirm(`Não foi possível localizar automaticamente os arquivos.\nDeseja abrir o seletor de arquivos?`);
-                if (open) window.pickFilesNative();
+                // Tratar como blobs normais in-memory
+                droppedFiles.forEach(f => registerWebPath(null, f));
             }
         } catch(err) {
+            console.error("Erro na busca local, tratando como mem. upload:", err);
             area.querySelector('h3').textContent = 'Arraste Arquivos Aqui ou Selecione';
-            window.pickFilesNative();
+            droppedFiles.forEach(f => registerWebPath(null, f));
         }
+
+        // Renderiza tudo na tela final
+        document.getElementById('web-staging-area').classList.remove('hidden');
+        renderWebBlocks();
     });
 }
 
@@ -512,20 +570,20 @@ async function addFolderToWebStaging(folderPath) {
     } catch(e) { /* ignora */ }
 }
 
-// Registra um caminho local no staging
-function registerWebPath(localPath) {
+// Registra um caminho local ou um arquivo de upload no staging
+function registerWebPath(localPath, fileObj = null) {
     if (!convertMap) return;
-    const name = localPath.split('/').pop();
+    const name = localPath ? localPath.split('/').pop() : fileObj.name;
     const ext = getExt(name);
     const cat = getCatForExt(ext);
 
-    // Busca tamanho via API (assíncrono, opcional)
     const entry = {
         _webId: 'dropfile_' + (++dropZoneIdCounter),
         _webCat: cat,
-        _webPath: localPath,   // caminho completo no disco
+        _webPath: localPath,   // caminho completo no disco (se houver)
+        _file: fileObj,        // objeto File (se for fallback upload)
         name: name,
-        size: null             // será preenchido via API se desejado
+        size: fileObj ? fileObj.size : null
     };
     webSelectionStaging.push(entry);
 }
@@ -588,8 +646,9 @@ function renderWebBlocks() {
                     <div class="flex items-center flex-1 overflow-hidden">
                         <button onclick="window.removeWebItem('${f._webId}')" class="text-slate-400 hover:text-red-500 mr-3 transition shrink-0"><i class="ph ph-x-circle text-xl"></i></button>
                         <i class="ph ph-file-text text-brand-400 text-xl mr-2 shrink-0 cursor-pointer" onclick="window.openWebPreview('${f._webId}')"></i>
-                        <span class="truncate text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600 hover:underline" title="${fullPath}" onclick="window.openWebPreview('${f._webId}')">${shortName}</span>
-                        <span class="text-xs text-slate-400 ml-3 font-mono shrink-0 hidden sm:block">${fullPath.replace(shortName, '').slice(0, 40)}...</span>
+                        <span class="truncate text-sm font-medium text-slate-700 cursor-pointer hover:text-brand-600 hover:underline" title="${fullPath || 'Upload via Browser'}" onclick="window.openWebPreview('${f._webId}')">${shortName}</span>
+                        <span class="text-[10px] text-slate-400 ml-3 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shrink-0 uppercase tracking-widest">${fullPath ? 'Local' : 'Upload'}</span>
+                        ${fullPath ? `<span class="text-xs text-slate-400 ml-3 font-mono shrink-0 hidden sm:block">${fullPath.replace(shortName, '').slice(0, 30)}...</span>` : ''}
                     </div>
                     ${cat !== 'invalido' ? `
                     <div class="flex items-center space-x-2 shrink-0 ml-7 sm:ml-0">
@@ -676,23 +735,25 @@ async function executeWebUpload(filesArr, dstExt) {
     const prefix = document.getElementById('web-config-prefix').value.trim();
     const folder = document.getElementById('web-config-folder').value.trim();
 
-    // Todos os arquivos têm caminho local (vindos do drag do Nautilus)
-    const paths = filesArr.map(f => f._webPath);
-
+    // Validação rígida: TODOS os arquivos devem ter um caminho físico associado
+    const allLocal = filesArr.every(f => f._webPath);
+    if (!allLocal) {
+        alert("Erro Crítico: Operação barrada.\nO sistema foi programado para JAMAIS fazer upload. Certifique-se de que os arquivos arrastados estão fisicamente no seu disco e tiveram seus caminhos (paths) localizados.");
+        return;
+    }
+    
     try {
+        const paths = filesArr.map(f => f._webPath);
         const res = await fetch('/api/convert/from_paths', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paths, dst_ext: dstExt, prefix, subfolder: folder })
         });
         const p = await res.json();
-        if (p.success) {
-            _onConvertSuccess(filesArr, p);
-        } else {
-            alert(`Conversão falhou:\n${p.error}`);
-        }
+        if (p.success) _onConvertSuccess(filesArr, p);
+        else alert(`Conversão falhou:\n${p.error}`);
     } catch(err) {
-        alert('Erro ao chamar o servidor: ' + err.message);
+        alert('Erro ao chamar o servidor local: ' + err.message);
     }
 }
 
@@ -711,7 +772,7 @@ function _onConvertSuccess(filesArr, p) {
 
 
 // ==== WEB PREVIEW MODAL ====
-// Usa /api/fs/preview?path=... igual ao Local Browser (sem upload)
+// Usa estritamente /api/fs/preview?path=... igual ao Local Browser (sem the Blob uploads)
 window.openWebPreview = function(id) {
     const entry = webSelectionStaging.find(f => f._webId === id);
     if (!entry) return;
@@ -722,8 +783,12 @@ window.openWebPreview = function(id) {
 
     document.getElementById('fs-preview-title').textContent = entry.name;
     const c = document.getElementById('fs-preview-content');
-    const url = `/api/fs/preview?path=${encodeURIComponent(entry._webPath)}`;
-    c.innerHTML = _buildPreviewMedia(entry._webCat, url);
+    
+    if (entry._webPath) {
+        c.innerHTML = _buildPreviewMedia(entry._webCat, `/api/fs/preview?path=${encodeURIComponent(entry._webPath)}`);
+    } else {
+        c.innerHTML = `<div class="text-white text-center">Preview indisponível:<br>Caminho local do arquivo não referenciado.</div>`;
+    }
 }
 
 

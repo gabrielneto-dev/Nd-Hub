@@ -38,13 +38,13 @@ app.register_blueprint(project_bp)
 app.register_blueprint(fs_bp)
 app.register_blueprint(convert_bp)
 
+# Inicialização de arquivos e pastas base
+init_auxiliary_files()
+os.makedirs('templates', exist_ok=True)
+os.makedirs('static/css', exist_ok=True)
+os.makedirs('static/js', exist_ok=True)
+
 if __name__ == '__main__':
-    # Inicializa arquivos base
-    init_auxiliary_files()
     
-    # Cria a pasta templates e static se não existirem
-    os.makedirs('templates', exist_ok=True)
-    os.makedirs('static/css', exist_ok=True)
-    os.makedirs('static/js', exist_ok=True)
     port = int(os.getenv('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
