@@ -55,12 +55,16 @@ function renderTools(tools) {
         return;
     }
 
-    tools.forEach(tool => {
+    tools.forEach((tool, idx) => {
+        const shortcutNum = idx < 9 ? (idx + 1) : '';
         const card = document.createElement('div');
-        card.className = "tool-card bg-white rounded-[20px] p-6 border border-slate-100 cursor-pointer shadow-card flex flex-col h-full";
+        card.className = "tool-card relative bg-white rounded-[20px] p-6 border border-slate-100 cursor-pointer shadow-card flex flex-col h-full hover:border-brand-300 transition-colors";
         card.onclick = () => openTool(tool.id);
         
+        let shortcutHtml = shortcutNum ? `<div class="absolute top-5 right-5"><kbd class="px-2 py-1 bg-slate-100 text-slate-400 rounded text-xs font-mono border border-slate-200 shadow-sm">${shortcutNum}</kbd></div>` : '';
+
         card.innerHTML = `
+            ${shortcutHtml}
             <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-2xl mb-5">
                 <i class="${getIconClass(tool.icon)}"></i>
             </div>
@@ -70,6 +74,19 @@ function renderTools(tools) {
         toolsGrid.appendChild(card);
     });
 }
+
+window.handleHomeShortcuts = function(e) {
+    if (homeView.classList.contains('hidden-view') || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const num = parseInt(e.key);
+    if (!isNaN(num) && num > 0 && num <= 9) {
+        const toolIndex = num - 1;
+        if (allTools && allTools[toolIndex]) {
+            openTool(allTools[toolIndex].id);
+        }
+    }
+};
+
+document.addEventListener('keydown', window.handleHomeShortcuts);
 
 function openTool(toolId) {
     const tool = allTools.find(t => t.id === toolId);
