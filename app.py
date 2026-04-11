@@ -1,5 +1,7 @@
-from flask import Flask
 import os
+import subprocess
+import signal
+from flask import Flask
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -25,6 +27,23 @@ def init_auxiliary_files():
             f.write('{}')
     
     print("✅ Arquivos auxiliares verificados/inicializados.")
+    
+def start_ducking_monitor():
+    # Caminho do monitor de ducking
+    monitor_path = "/home/neto/gns/tools/ducking.py"
+    
+    # Verifica se o processo ja esta rodando para evitar duplicatas (especialmente em debug mode)
+    # Se WERKZEUG_RUN_MAIN nao estiver presente, estamos no processo pai do Flask (reloader)
+    # Queremos rodar apenas no processo principal de execucao.
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+        try:
+            # Tenta matar instâncias anteriores do mesmo script se houver
+            subprocess.run(["pkill", "-f", monitor_path], stderr=subprocess.DEVNULL)
+            
+            print(f"🚀 Iniciando monitor de ducking: {monitor_path}")
+            subprocess.Popen(["python3", monitor_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            print(f"❌ Erro ao iniciar monitor de ducking: {e}")
 
 # Permite uploads de até 2GB (necessário para vídeos e lotes grandes)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
@@ -43,8 +62,9 @@ init_auxiliary_files()
 os.makedirs('templates', exist_ok=True)
 os.makedirs('static/css', exist_ok=True)
 os.makedirs('static/js', exist_ok=True)
+start_ducking_monitor()
 
 if __name__ == '__main__':
-    
+    os.system('clear')
     port = int(os.getenv('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)

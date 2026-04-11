@@ -15,6 +15,7 @@ const audioDevicesGrid = document.getElementById('audio-devices-grid');
 const systemUiArea = document.getElementById('system-ui-area');
 const projectUiArea = document.getElementById('project-ui-area');
 const convertUiArea = document.getElementById('convert-ui-area');
+const duckingUiArea = document.getElementById('ducking-ui-area');
 
 // Tool View Elements
 const sidebarIcon = document.getElementById('sidebar-tool-icon');
@@ -144,11 +145,24 @@ function openTool(toolId) {
         if (typeof window.initConvertApp === 'function') {
             window.initConvertApp();
         }
+    } else if (tool.type === 'ducking') {
+        if (cliActionArea) cliActionArea.classList.add('hidden-view');
+        if (cliConsoleArea) cliConsoleArea.classList.add('hidden-view');
+        if (audioUiArea) audioUiArea.classList.add('hidden-view');
+        if (systemUiArea) systemUiArea.classList.add('hidden-view');
+        if (projectUiArea) projectUiArea.classList.add('hidden-view');
+        if (convertUiArea) convertUiArea.classList.add('hidden-view');
+        if (duckingUiArea) duckingUiArea.classList.remove('hidden-view');
+        
+        if (typeof window.initDuckingUI === 'function') {
+            window.initDuckingUI();
+        }
     } else {
         if (audioUiArea) audioUiArea.classList.add('hidden-view');
         if (systemUiArea) systemUiArea.classList.add('hidden-view');
         if (projectUiArea) projectUiArea.classList.add('hidden-view');
         if (convertUiArea) convertUiArea.classList.add('hidden-view');
+        if (duckingUiArea) duckingUiArea.classList.add('hidden-view');
         if (cliActionArea) cliActionArea.classList.remove('hidden-view');
         if (cliConsoleArea) cliConsoleArea.classList.remove('hidden-view');
         outputConsole.innerHTML = `<span class="text-slate-500">Pronto para rodar \`${tool.id}\`...</span>\n\nAguardando clique.`;

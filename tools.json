@@ -26,5 +26,12 @@
     "description": "Ferramenta de conversão definitiva (Imagens, PDFs, Dados e Vídeos). Suporte para navegação de pasta local in-place e drag-drop web.",
     "icon": "arrows-left-right",
     "type": "convert"
+  },
+  {
+    "id": "spotify-ducking",
+    "name": "Spotify Ducking",
+    "description": "Controle a atenuação automática do Spotify quando outros sons são detectados no sistema.",
+    "icon": "headphones",
+    "type": "ducking"
   }
 ]
