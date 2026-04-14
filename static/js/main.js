@@ -89,6 +89,13 @@ window.handleHomeShortcuts = function(e) {
 
 document.addEventListener('keydown', window.handleHomeShortcuts);
 
+function hideAllSections() {
+    const areas = [cliActionArea, cliConsoleArea, audioUiArea, systemUiArea, projectUiArea, convertUiArea, duckingUiArea];
+    areas.forEach(area => {
+        if (area) area.classList.add('hidden-view');
+    });
+}
+
 function openTool(toolId) {
     const tool = allTools.find(t => t.id === toolId);
     if(!tool) return;
@@ -106,63 +113,33 @@ function openTool(toolId) {
         document.removeEventListener('keydown', handleAudioShortcuts);
     }
     
+    // Reset all views first to avoid overlaps
+    hideAllSections();
+
     if (tool.type === 'audio') {
-        if (cliActionArea) cliActionArea.classList.add('hidden-view');
-        if (cliConsoleArea) cliConsoleArea.classList.add('hidden-view');
-        if (systemUiArea) systemUiArea.classList.add('hidden-view');
-        if (projectUiArea) projectUiArea.classList.add('hidden-view');
-        if (convertUiArea) convertUiArea.classList.add('hidden-view');
         if (audioUiArea) audioUiArea.classList.remove('hidden-view');
-        
         if (typeof loadAudioDevices === 'function') {
             loadAudioDevices();
             document.addEventListener('keydown', handleAudioShortcuts);
         }
     } else if (tool.type === 'system') {
-        if (cliActionArea) cliActionArea.classList.add('hidden-view');
-        if (cliConsoleArea) cliConsoleArea.classList.add('hidden-view');
-        if (audioUiArea) audioUiArea.classList.add('hidden-view');
-        if (projectUiArea) projectUiArea.classList.add('hidden-view');
-        if (convertUiArea) convertUiArea.classList.add('hidden-view');
         if (systemUiArea) systemUiArea.classList.remove('hidden-view');
     } else if (tool.type === 'project') {
-        if (cliActionArea) cliActionArea.classList.add('hidden-view');
-        if (cliConsoleArea) cliConsoleArea.classList.add('hidden-view');
-        if (audioUiArea) audioUiArea.classList.add('hidden-view');
-        if (systemUiArea) systemUiArea.classList.add('hidden-view');
-        if (convertUiArea) convertUiArea.classList.add('hidden-view');
         if (projectUiArea) projectUiArea.classList.remove('hidden-view');
         if (typeof window.loadProjectsGrid === 'function') {
             window.loadProjectsGrid();
         }
     } else if (tool.type === 'convert') {
-        if (cliActionArea) cliActionArea.classList.add('hidden-view');
-        if (cliConsoleArea) cliConsoleArea.classList.add('hidden-view');
-        if (audioUiArea) audioUiArea.classList.add('hidden-view');
-        if (systemUiArea) systemUiArea.classList.add('hidden-view');
-        if (projectUiArea) projectUiArea.classList.add('hidden-view');
         if (convertUiArea) convertUiArea.classList.remove('hidden-view');
         if (typeof window.initConvertApp === 'function') {
             window.initConvertApp();
         }
     } else if (tool.type === 'ducking') {
-        if (cliActionArea) cliActionArea.classList.add('hidden-view');
-        if (cliConsoleArea) cliConsoleArea.classList.add('hidden-view');
-        if (audioUiArea) audioUiArea.classList.add('hidden-view');
-        if (systemUiArea) systemUiArea.classList.add('hidden-view');
-        if (projectUiArea) projectUiArea.classList.add('hidden-view');
-        if (convertUiArea) convertUiArea.classList.add('hidden-view');
         if (duckingUiArea) duckingUiArea.classList.remove('hidden-view');
-        
         if (typeof window.initDuckingUI === 'function') {
             window.initDuckingUI();
         }
     } else {
-        if (audioUiArea) audioUiArea.classList.add('hidden-view');
-        if (systemUiArea) systemUiArea.classList.add('hidden-view');
-        if (projectUiArea) projectUiArea.classList.add('hidden-view');
-        if (convertUiArea) convertUiArea.classList.add('hidden-view');
-        if (duckingUiArea) duckingUiArea.classList.add('hidden-view');
         if (cliActionArea) cliActionArea.classList.remove('hidden-view');
         if (cliConsoleArea) cliConsoleArea.classList.remove('hidden-view');
         outputConsole.innerHTML = `<span class="text-slate-500">Pronto para rodar \`${tool.id}\`...</span>\n\nAguardando clique.`;

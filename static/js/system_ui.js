@@ -15,7 +15,7 @@ window.requestSystemAction = async function(action, humanName) {
         
         const payload = await response.json();
         if (payload.success) {
-            alert(`Sinal eviado: ${humanName} em andamento...`);
+            alert(payload.message || `Sinal enviado: ${humanName} em andamento...`);
         } else {
             alert(`Falha: ${payload.error}`);
         }

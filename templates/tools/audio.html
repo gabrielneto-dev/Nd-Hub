@@ -1,0 +1,19 @@
+<!-- Áudio UI Area -->
+<div id="audio-ui-area" class="hidden-view mt-4">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center space-x-4">
+            <h3 class="text-xl font-semibold text-slate-800">Dispositivos de Saída disponíveis</h3>
+            <label class="flex items-center space-x-2 text-sm text-slate-500 cursor-pointer hover:text-slate-700 transition">
+                <input type="checkbox" id="toggle-archived" onchange="toggleArchived(this)"
+                    class="rounded border-slate-300 text-brand-500 focus:ring-brand-500">
+                <span>Exibir Arquivados</span>
+            </label>
+        </div>
+        <span class="text-xs text-slate-500 font-medium bg-slate-200 px-3 py-1 rounded-full flex items-center shadow-sm">
+            <i class="ph ph-keyboard mr-1"></i> Atalhos: Teclas 1 a 9
+        </span>
+    </div>
+    <div id="audio-devices-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Cards de áudio injetados via JS -->
+    </div>
+</div>
